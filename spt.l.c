@@ -2,17 +2,17 @@
 // by using the Bellman-Ford algorithm (uses a queue)
 
 // my headers
-#include "graph.h"
+//#include "graph.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
 
 //Glib headers for the queue and the list
 #include <glib.h>
 
 // readline is used to read the input graph
 #include <readline/readline.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <limits.h>
 
 /* The graph node */
 typedef struct node_t {
@@ -24,36 +24,50 @@ void destroy_node(gpointer data) {
     free(data);
 }
 
-void print_graph(GSlist *graph, const int order) {
+void print_graph(GSList *graph, const int order) {
     int i, j;
     for (i = 0; i < order; i++) {
         printf("%d -> ", i);
         
-        for (j = 0; j < g_slist_length() - 1; j++) {
-            printf("%d (%d), ", G[i].adjacent[j], G[i].weights[j]);
+        // gets the element at position j in the list (dest vertex and edge weight)
+        Node *el = NULL;
+        for (j = 0; j < g_slist_length(graph) - 1; j++) {
+            el = g_slist_nth_data(graph, j);
+            if(!el) {
+                puts("Something went wrong while reading the graph");
+                exit(1);
+            }
+            //printf("%d (%d), ", G[i].adjacent[j], G[i].weights[j]);
+            printf("%d (%f), ", el->destination, el->weight);
         }
-        printf("%d (%d)\n", G[i].adjacent[j], G[i].weights[j]);
+        el = g_slist_nth_data(graph, j);
+            if(!el) {
+                puts("Something went wrong while reading the graph");
+                exit(1);
+        }
+        printf("%d (%f)\n", el->destination, el->weight);
     }
     putchar('\n');
 }
 
 int main(void) {
     // reads the vertices and edges, then the graph
-    int vertices, edges;
+    int vertices;
     int max_w = INT_MIN; // initializes max weight to the minimum integer
     printf("Enter the number of vertices and edges: ");
-    scanf("%d %d", &vertices, &edges);
+    scanf("%d", &vertices);
 
     // The graph is an adjacency matrix (list of lists)
     //Graph G = read_graph(vertices, &max_w);
-    GSlist *graph = NULL;   // initialized as the empty list
-    // read the vertex's adjacency list using readline()
-    char *line = readline(NULL);
-    GSlist *adjlist = NULL;
+    GSList *graph = NULL;   // initialized as the empty list
+    GSList *adjlist = NULL;
     int dest = -1;
     float weight = 0;
     Node *n = NULL;
-    while(line) {
+    char *line = NULL;
+    for(int i = 0; i < vertices; i++) {
+        // read the vertex's adjacency list using readline()
+        line = readline(NULL);
         // parse the adjacency list in a list
         while(scanf(" %d:%f", &dest, &weight) == 2) {
             // allocates memory for the pointer to the Node and fills its records
@@ -75,11 +89,11 @@ int main(void) {
         
         // input line freed
         free(line);
-        // a new line is then read from input
-        line = readline(NULL);
+        line = NULL;
     }
     // input line freed
     free(line);
+    line = NULL;
     // then the list is cleared and its head pointer set to NULL to be safe
     g_clear_slist(&adjlist, destroy_node);
     adjlist = NULL;
@@ -93,15 +107,12 @@ int main(void) {
     printf("Enter the root node [0, %d]: ", vertices-1);
     scanf("%d", &root);
 
-    // fifo list Q
-    //Queue Qhead = NULL;
-    //Queue Qtail = NULL;
-    
+    // fifo list Q    
     // defines and initializes a queue
     GQueue *Q = g_queue_new();
 
     // each node i has a label (the cost of the path from the root to i)
-    int *labels = (int*) malloc(vertices * sizeof(int));
+    float *labels = (float*) malloc(vertices * sizeof(float));
     // each node j has a predecessor i: in the tree there is the edge i -> j
     int *predecessors = (int*) malloc(vertices * sizeof(int));
 
@@ -132,25 +143,26 @@ int main(void) {
         
         // in Bellman-Ford Q is FIFO and dequeued at each iteration
         u = GPOINTER_TO_INT(g_queue_pop_head(Q));
-        u = g_slist_find(graph, 
+        // get the u's adjacency list in the graph
+        adjlist = g_slist_nth(graph, u);
 
         // check each forward edge from u
-        for (i = 0; i < G[u].out_degree; i++) {
-
+        for (i = 0; i < g_slist_length(adjlist); i++) {
+            n = g_slist_nth_data(adjlist, i);
             // check if the edge (u, i) violates the corresponding Bellman condition
-            if (labels[G[u].adjacent[i]] > labels[u] + G[u].weights[i]) {
-                printf("(%d, %d) violates Bellman\n", u, G[u].adjacent[i]);
-                printf("d_%d\t+\tc_%d_%d\t<\td_%d\n", u, u, G[u].adjacent[i], G[u].adjacent[i]);
-                printf("%d\t+\t%d\t<\t%d\n", labels[u], G[u].weights[i], labels[G[u].adjacent[i]]);
+            if (labels[n->destination] > labels[u] + n->weight) {
+                printf("(%d, %d) violates Bellman\n", u, n->destination);
+                printf("d_%d\t+\tc_%d_%d\t<\td_%d\n", u, u, n->destination, n->destination);
+                printf("%f\t+\t%f\t<\t%f\n", labels[u], n->weight, labels[n->destination]);
 
                 // update labels[i] (not its tree!) and its predecessor if it changes
-                labels[G[u].adjacent[i]] = labels[u] + G[u].weights[i];
-                if (predecessors[G[u].adjacent[i]] != u) {
-                    predecessors[G[u].adjacent[i]] = u;
+                labels[n->destination] = labels[u] + n->weight;
+                if (predecessors[n->destination] != u) {
+                    predecessors[n->destination] = u;
                 }
-                // inserts G[u].adjacent[i] in Q if it's not already in there
-                if (g_queue_find(Q, GINT_TO_POINTER(G[u].adjacent[i])) == NULL) {
-                    g_queue_push_tail(Q, GINT_TO_POINTER(G[u].adjacent[i]));
+                // inserts the head of the edge (vertex i) in Q if it's not already in there
+                if (g_queue_find(Q, GINT_TO_POINTER(n->destination)) == NULL) {
+                    g_queue_push_tail(Q, GINT_TO_POINTER(n->destination));
                 }
             }
         }
@@ -162,6 +174,6 @@ int main(void) {
     printf("After %d iterations, the SPT found by Bellman-Ford is\n", count_it);
     // the resulting spt is represented by labels & predecessors
     for(i = 0; i< vertices; i++) {
-        printf("label[%d] = %d\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
+        printf("label[%d] = %f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
     }
 }
