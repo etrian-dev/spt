@@ -1,18 +1,17 @@
 // finds the SPT in a digraph G = (N, A)
 // by using the Bellman-Ford algorithm (uses a queue)
 
-// my headers
-#include "graph.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+#include <math.h>
 
 //Glib headers for the queue and the list
 #include <glib.h>
 
 // readline is used to read the input graph
 #include <readline/readline.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <limits.h>
 
 /* The graph node */
 typedef struct node_t {
@@ -24,38 +23,50 @@ void destroy_node(gpointer data) {
     free(data);
 }
 
-void print_graph(GSlist *graph, const int order) {
+void print_graph(GSList* graph, const int order) {
     int i, j;
+    GSList* adjlist = NULL;
+    Node* n = NULL:
+
+    // prints the graph
     for (i = 0; i < order; i++) {
+        adjlist = g_slist_nth(graph, i);
+
         printf("%d -> ", i);
-        
-        for (j = 0; j < g_slist_length() - 1; j++) {
-            printf("%d (%d), ", G[i].adjacent[j], G[i].weights[j]);
+        for (j = 0; j < g_slist_length(adjlist) - 1; j++) {
+            n = g_slist_nth_data(adjlist, j);
+            printf("%d (%f), ", n->destination, n->weight);
         }
-        printf("%d (%d)\n", G[i].adjacent[j], G[i].weights[j]);
+        n = g_slist_nth_data(adjlist, j);
+        printf("%d (%f)\n", n->destination, n->weight);
     }
     putchar('\n');
 }
 
 int main(void) {
     // reads the vertices and edges, then the graph
-    int vertices, edges;
-    int max_w = INT_MIN; // initializes max weight to the minimum integer
-    printf("Enter the number of vertices and edges: ");
-    scanf("%d %d", &vertices, &edges);
+    int vertices;
+    float max_w = -INFINITY; // initializes max weight to the minimum float
+    printf("Enter the number of vertices: ");
+    scanf("%d", &vertices);
 
-    // The graph is an adjacency matrix (list of lists)
-    //Graph G = read_graph(vertices, &max_w);
-    GSlist *graph = NULL;   // initialized as the empty list
-    // read the vertex's adjacency list using readline()
-    char *line = readline(NULL);
-    GSlist *adjlist = NULL;
+    // The graph is an adjacency list (list of lists)
+    GSList* graph = NULL;   // initialized as the empty list
+    GSList* adjlist = NULL;
     int dest = -1;
     float weight = 0;
+
     Node *n = NULL;
-    while(line) {
-        // parse the adjacency list in a list
-        while(scanf(" %d:%f", &dest, &weight) == 2) {
+    char* line = NULL;
+    char* token = NULL:
+    while (int i = 0; i < vertices; i++) {
+        // reads the adjacency list of vertex i
+        line = readline(NULL);
+        // tokenizes it: tokens are separated by " "
+        token = strtok(line, " ");
+        while (token) {
+            // parses the token in the destination vertex and the edge's weight
+            sscanf(token, "%d:%f", &dest, &weight);
             // allocates memory for the pointer to the Node and fills its records
             n = (Node*)malloc(sizeof(Node));
             if(n == NULL) {
@@ -66,20 +77,29 @@ int main(void) {
             n->weight = weight;
             // prepends the Node n to the list
             adjlist = g_slist_prepend(adjlist, n);
+
+            //update the max weight if greater than current
+            if (max_w < weight) {
+                max_w = weight;
+            }
+
+            // get the next token
+            token = strtok(NULL, " ");
         }
-        graph = g_slist_prepend(graph, adjlist);
+        // prepend the adjacency list to the graph
+        // TODO: prepend and then reverse once built to improve performance
+        graph = g_slist_append(graph, adjlist);
         
-        // then the list is cleared and its head pointer set to NULL to be safe
+        // then the dummy list is cleared but its elements are not freed
         g_clear_slist(&adjlist, destroy_node);
         adjlist = NULL;
         
         // input line freed
         free(line);
-        // a new line is then read from input
-        line = readline(NULL);
     }
     // input line freed
     free(line);
+
     // then the list is cleared and its head pointer set to NULL to be safe
     g_clear_slist(&adjlist, destroy_node);
     adjlist = NULL;
@@ -93,19 +113,15 @@ int main(void) {
     printf("Enter the root node [0, %d]: ", vertices-1);
     scanf("%d", &root);
 
-    // fifo list Q
-    //Queue Qhead = NULL;
-    //Queue Qtail = NULL;
-    
     // defines and initializes a queue
     GQueue *Q = g_queue_new();
 
     // each node i has a label (the cost of the path from the root to i)
-    int *labels = (int*) malloc(vertices * sizeof(int));
+    float* labels = (float*)malloc(vertices * sizeof(float));
     // each node j has a predecessor i: in the tree there is the edge i -> j
     int *predecessors = (int*) malloc(vertices * sizeof(int));
 
-    int max_path = (vertices - 1) * max_w + 1;
+    float max_path = (vertices - 1) * max_w + 1;
     // build the initial tree, by putting all the labels to 1 + the max possile path in the graph
     for(i = 0; i < vertices; i++) {
         if(i != root) {
