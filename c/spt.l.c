@@ -14,8 +14,9 @@
 // main function: reads a digraph from stdin, then applies Bellman-Ford on it
 // to find the SPT (Shortest Paths Tree)
 int main(void) {
-    // read the graph
-    float max_w; // stores the max edge weight in the graph
+
+	float max_w; // stores the max edge weight in the graph
+    // read the graph    
     Graph graph = new_graph(&max_w);
 
     // print the graph
@@ -24,21 +25,29 @@ int main(void) {
 
     // choose the root node
     int root;
-    char *line = NULL;
+    char *line;
     line = readline("Enter the root node: ");
-    root = atoi(line);
+    root = atoi(line); // node label is assumed to be an integer
+    
     free(line);
     line = NULL;
 
-    // fifo list Q, a GQueue from Glib
+    // fifo list Q, a GQueue from Glib to store the visited nodes
     GQueue* Q = g_queue_new();
 
     // each node i has a label (the cost of the path from the root to i)
     float* labels = (float*)malloc(graph.order * sizeof(float));
-    // each node j has a predecessor i: in the tree there is the edge i -> j
+    // each node j has a predecessor i 
+    // <=>
+    // in the SPT there is an edge i -> j
     int* predecessors = (int*)malloc(graph.order * sizeof(int));
-    // the longest path
+    // the most expensive path possible in the graph is used as a fake edge weight
     float max_path = (float)(graph.order - 1) * max_w + 1;
+    // array to store how many times a node has been removed from Q
+    // when any node reaches n rimotions, a negative cycle is found
+    // => the instance of the problem has no lower limit
+    int* count_rm = (int*)calloc(graph.order, sizeof(int)); // memory init to 0 by calloc
+    
     int i;
     // build the initial tree, by putting all the labels to 1 + the max possile path in the graph
     for (i = 0; i < graph.order; i++) {
@@ -61,14 +70,23 @@ int main(void) {
     GSList *adjlist = NULL;
     int u = 0;
     int count_it = 0; // just counts the iterations
+    int neg_cycle = 0;
 
     // while Q is not empty, loop
-    while (!g_queue_is_empty(Q)) {
+    while (!g_queue_is_empty(Q) && !neg_cycle) {
         // updates the number of iterations
         count_it++;
 
         // in Bellman-Ford Q is FIFO and dequeued at each iteration
         u = GPOINTER_TO_INT(g_queue_pop_head(Q));
+        
+        // check if there's a negative cycle; if so, exits the loop
+        count_rm[u]++;
+        if(count_rm[u] == graph.order) {
+        	neg_cycle = 1;
+        	continue;
+        }
+        
         // get u's adjacency list in the graph
         n = g_list_nth_data(graph.nodes, u);
         adjlist = n->adjacent;
@@ -96,12 +114,17 @@ int main(void) {
         }
     }
 
-    // free the queue (no dynamically alloc'd data stored
+    // free the queue (no dynamically alloc'd data stored)
     g_queue_free(Q);
 
-    printf("After %d iterations, the SPT found by Bellman-Ford is\n", count_it);
-    // the resulting spt is represented by labels & predecessors
-    for (i = 0; i < graph.order; i++) {
-        printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
+    if(neg_cycle) {
+    	puts("Negative cycle! No lower bound");
     }
+    else {
+		printf("After %d iterations, the SPT found by Bellman-Ford is\n", count_it);
+		// the resulting spt is represented by labels & predecessors
+		for (i = 0; i < graph.order; i++) {
+		    printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
+		}
+	}
 }
