@@ -127,4 +127,12 @@ int main(void) {
 		    printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
 		}
 	}
+	
+	// free the graph nodes
+	g_list_free(graph.nodes);
+	
+	// free the various helper arrays
+    free(labels);
+    free(predecessors);
+    free(count_rm);
 }
