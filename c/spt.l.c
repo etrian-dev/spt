@@ -17,7 +17,7 @@
 // to find the SPT (Shortest Paths Tree)
 int main(void) {
 
-	float max_w; // stores the max edge weight in the graph
+    float max_w; // stores the max edge weight in the graph
     // create and read a new graph from stdin
     Graph graph = new_graph(&max_w);
 
@@ -31,30 +31,30 @@ int main(void) {
     line = readline("Enter the root node: ");
     // node label is assumed to be an integer that can be converted using atoi
     root = atoi(line);
-    
+
     // mem free
     free(line);
     line = NULL;
 
-    // create a new GQueue (defined by GLib), a fifo list to store visited vertices 
-    GQueue* Q = g_queue_new();
+    // create a new GQueue (defined by GLib), a fifo list to store visited vertices
+    GQueue *Q = g_queue_new();
 
     // each node i has a label (the cost of the current path from root to i)
-    float* labels = (float*)malloc(graph.order * sizeof(float));
+    float *labels = (float *)malloc(graph.order * sizeof(float));
 
     // a node j has a predecessor i <=> in the SPT there is an edge i -> j
-    int* predecessors = (int*)malloc(graph.order * sizeof(int));
+    int *predecessors = (int *)malloc(graph.order * sizeof(int));
 
     // the most expensive path possible in the graph is used as a fake edge weight
     float max_path = (float)(graph.order - 1) * max_w + 1;
 
     // array to store how many times a node has been removed from Q
-    // when any node reaches n insertions (and subsequent remotions), 
-    // then a negative cycle is found is present in the graph 
+    // when any node reaches n insertions (and subsequent remotions),
+    // then a negative cycle is found is present in the graph
     // => the instance of the problem has no lower limit
-    int* count_rm = (int*)calloc(graph.order, sizeof(int));
+    int *count_rm = (int *)calloc(graph.order, sizeof(int));
     // memory set to 0 by calloc, no need to initialize manually
-    
+
     // build the initial tree, by setting all the labels to max_path + 1.0
     int i;
     for (i = 0; i < graph.order; i++) {
@@ -68,7 +68,7 @@ int main(void) {
     }
 
     // the tail nodes of those edges who violate bellman conditions
-    // must be inserted in Q. In this case, only the root is violating them, 
+    // must be inserted in Q. In this case, only the root is violating them,
     // because of how the tree is built
     g_queue_push_tail(Q, GINT_TO_POINTER(root));
     // the data must be stored as a gpointer, so the macro converts to it from int
@@ -89,25 +89,25 @@ int main(void) {
         // in Bellman-Ford Q is FIFO and, so the head is popped at each iteration
         u = GPOINTER_TO_INT(g_queue_pop_head(Q));
         // data in Q is a gpointer, the macro converts back to integer
-        
+
         // if there's a negative cycle (a node has been removed |N| == graph order times)
-        // then the loop exits 
+        // then the loop exits
         count_rm[u]++;
         if(count_rm[u] == graph.order) {
-        	neg_cycle = true;
-        	continue;
+            neg_cycle = true;
+            continue;
         }
 
         // CHECKS BELLMAN CONDITIONS ON THE FORWARD EDGES FROM U
-        
+
         // get u's adjacency list in the graph
-        adjlist = ((Node*)g_list_nth_data(graph.nodes, u))->adjacent;
+        adjlist = ((Node *)g_list_nth_data(graph.nodes, u))->adjacent;
 
         // check each forward edge from u
         while (adjlist != NULL) {
-            // get the edge 
+            // get the edge
             // the casting is implicit, but useful to understand what's going on
-            e = (Edge*)(adjlist->data);
+            e = (Edge *)(adjlist->data);
             // check if the edge (u, i) violates the Bellman condition
             // BELLMAN: d_u + c_ui >= d_i => OK, otherwise the condition is violated
             if (labels[e->destination] > labels[u] + e->weight) {
@@ -135,24 +135,24 @@ int main(void) {
     g_queue_free(Q);
 
     if(neg_cycle) {
-    	puts("Negative cycle! No lower bound");
+        puts("Negative cycle! No lower bound");
     }
     else {
-		printf("After %d iterations, the SPT found by Bellman-Ford is\n", count_it);
-		// the resulting spt is represented by labels & predecessors
+        printf("After %d iterations, the SPT found by Bellman-Ford is\n", count_it);
+        // the resulting spt is represented by labels & predecessors
         float spt_cost = 0.0;
-		for (i = 0; i < graph.order; i++) {
-		    printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
+        for (i = 0; i < graph.order; i++) {
+            printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
             spt_cost += labels[i];
-		}
+        }
         // the total cost is also printed to stdout
         printf("Total cost of the SPT: %f\n", spt_cost);
-	}
-	
-	// free the graph nodes
-	g_list_free(graph.nodes);
-	
-	// free the various helper arrays
+    }
+
+    // free the graph nodes
+    g_list_free(graph.nodes);
+
+    // free the various helper arrays
     free(labels);
     free(predecessors);
     free(count_rm);
