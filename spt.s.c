@@ -1,8 +1,8 @@
-// finds the SPT in a weighted directed graph G = (N, A)
-// by using Dijkstra's algorithm, by using a priority queue for choosing a vertex at
-// each iteration. The time complexity is guarranteed to be T(n, m) = O(n^2)
-// iff all weights are positive, at worst exponential otherwise
-
+// Finds the SPT of a weighted directed graph G = (N, A), by using 
+// Dijkstra's algorithm (adapted for finding the shortest path tree).
+// The time complexity is T(|V|, |E|) = O(|V|^2) if and only if all weights are 
+// positive (integers or floating point), exponential otherwise (in the worst case).
+// It may not terminate at all if there are negative cycles in the graph (see spt.l)
 
 /*
  * spt.s.c
@@ -24,13 +24,12 @@
  * along with spt.s. If not, see <http://www.gnu.org/licenses/>.
  */
 
+// my functions to handle graph reading
+#include "glib-graph.h"
 
-// my utility for manipulating graphs
-#include <glib-graph.h>
-// libreadline for input
-#include <readline/readline.h>
-// Glib header for data structures (GList, GQueue, ...)
-#include <glib.h>
+#include <readline/readline.h> // libreadline for input
+#include <glib.h> // Glib header for data structures (GList, GQueue, ...)
+
 // standard lib headers
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,14 +37,14 @@
 // A queue element is the program's representation of a node in the SPT:
 struct q_element
 {
-    int vertex;      // the current node's label (an integer for simplicity)
-    int predecessor; // the predecessor of vertex in the SPT
-    float label;     // the shortest path weight on the current tree from root to vertex
+    int vertex;      // the node's identifier (int because it's simple and efficient)
+    int predecessor; // the node's predecessor in the current SPT
+    float label;     // the current shortest path from root to the node
 };
-// the pointer alias is not really necessary, but avoids too many "*"s in the code
 typedef struct q_element *Element;
 
-// glib-style comparison function to compute the priority of Element a versus Element b
+// glib-style comparison function to compute the priority of Elements
+// the priority in this context is given by its label field
 // user_data is just ignored
 gint smallest_label(gconstpointer a, gconstpointer b, gpointer user_data)
 {
@@ -62,7 +61,7 @@ gint smallest_label(gconstpointer a, gconstpointer b, gpointer user_data)
     return 0;
 }
 
-// program to compute the shortest path tree in a directed graph with dijkstra's algorithm
+// The program reads a graph and asks for a root node, then computes the SPT
 int main(void)
 {
     float max_w;                     // max weight in the graph
@@ -218,13 +217,11 @@ int main(void)
     // the total cost is also printed to stdout
     printf("Total cost of the SPT: %f\n", spt_cost);
 
-    // free the elements array
+	// all the necessary frees
     for (i = 0; i < graph.order; i++)
     {
         free(vertices[i]);
     }
     free(vertices);
-
-    // free the graph nodes
     g_list_free(graph.nodes);
 }

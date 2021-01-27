@@ -1,4 +1,4 @@
-// finds the SPT in a digraph G = (N, A) with the Bellman-Ford algorithm in O(mn) time
+// finds the SPT in a digraph G = (N, E) with the Bellman-Ford algorithm in O(|V|*|E|) time
 
 /*
  * spt.l.c
@@ -20,12 +20,13 @@
  * along with spt.l. If not, see <http://www.gnu.org/licenses/>.
  */
 
-// my utility for manipulating graphs
-#include <glib-graph.h>
+// my functions to handle graph reading
+#include "glib-graph.h"
 
 #include <readline/readline.h> // for reading input lines
 #include <glib.h> // Glib header for data structures (GList, GQueue, ...)
 
+// standard library headers
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -165,8 +166,8 @@ int main(void) {
         printf("Total cost of the SPT: %f\n", spt_cost);
     }
 
+	// all the necessary frees
     g_list_free(graph.nodes);
-
     free(labels);
     free(predecessors);
     free(count_rm);
