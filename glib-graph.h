@@ -48,8 +48,12 @@ typedef struct graph_t {
 	that gets overwritten inside the function.
 	It's useful in algorithms such as SPT.L or SPT.S
 */
-Graph new_graph(float *max_weight);
+Graph new_graph(float *min_weight, float *max_weight);
 /* Prints the graph to target, where target can be any open file descriptor */
 void print_graph(FILE *target, Graph g);
+// a new node is added as a super root, connecting it with edges
+// of weight 0 to all the nodes in the supplied GArray
+// Returns the index of the newly created node
+int graph_add_roots(Graph *g, GArray *roots);
 
 #endif

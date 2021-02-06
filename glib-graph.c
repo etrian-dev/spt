@@ -29,7 +29,7 @@
   Reads the graph from standard input with readline
   Must be stored in an adjacency list format
 */
-Graph new_graph(float *max_weight) {
+Graph new_graph(float *min_weight, float *max_weight) {
   // The graph is an adjacency list (doubly linked)
   // of nodes, which in turn contain a singly linked edge list
   Graph g;
@@ -40,7 +40,7 @@ Graph new_graph(float *max_weight) {
   char* line = NULL;
   line = readline("Enter the number of vertices: ");
   g.order = atoi(line); // assuming a valid integer
-  
+
   free(line);
   line = NULL;
 
@@ -48,7 +48,8 @@ Graph new_graph(float *max_weight) {
   GSList* adjlist = NULL;
   int dest = -1;
   float weight = 0;
-  *max_weight = -INFINITY;  // store smallest value: less than any float
+  *min_weight = INFINITY; // store biggest value: greater than any float
+  *max_weight = -INFINITY; // store smallest value: less than any float
   Node* n = NULL;
   Edge* e = NULL;
   char* token = NULL;
@@ -76,8 +77,11 @@ Graph new_graph(float *max_weight) {
           adjlist = g_slist_prepend(adjlist, e);
 
           //update the max weight if greater than current
-          if (*max_weight < weight) {
+          if(*max_weight < weight) {
               *max_weight = weight;
+          }
+          if(*min_weight > weight) {
+            *min_weight = weight;
           }
 
           // get the next token
@@ -125,4 +129,37 @@ void print_graph(FILE *target, Graph g) {
         }
         fputc('\n', target);
     }
+}
+
+// a new node is added as a super root, connecting it with edges
+// of weight 0 to all the nodes in the supplied GArray
+int graph_add_roots(Graph *G, GArray *roots) {
+  // first build the adjacency list of root
+  int i, lenght = roots->len;
+  GSList *adjlist = NULL;
+  Edge *e = NULL;
+  for(i = 0; i < lenght; i++) {
+    e = (Edge *)malloc(sizeof(Edge));
+    if(!e) {
+      g_error("Failed to alloc Edge");
+    }
+    // set the edge's head to the i-th root with weight 0
+    e->destination = g_array_index(roots, int, i);
+    e->weight = 0.0;
+    // prepend the edge to the adjacency list of the node
+    adjlist = g_slist_prepend(adjlist, e);
+  }
+
+  Node *n = (Node *)malloc(sizeof(Node));
+  if(!n) {
+    g_error("Failed to alloc Node");
+  }
+  // then set the node's adjacency list to the one created in the loop
+  n->vertex = G->order; // the new super-root is set to be the next available integer
+  n->adjacent = adjlist;
+  // then add the node to the graph and update it consequently
+  G->order += 1;
+  G->nodes = g_list_prepend(G->nodes, n);
+
+  return G->order;
 }

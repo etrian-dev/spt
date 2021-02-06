@@ -1,6 +1,6 @@
-// Finds the SPT of a weighted directed graph G = (N, A), by using 
+// Finds the SPT of a weighted directed graph G = (N, A), by using
 // Dijkstra's algorithm (adapted for finding the shortest path tree).
-// The time complexity is T(|V|, |E|) = O(|V|^2) if and only if all weights are 
+// The time complexity is T(|V|, |E|) = O(|V|^2) if and only if all weights are
 // positive (integers or floating point), exponential otherwise (in the worst case).
 // It may not terminate at all if there are negative cycles in the graph (see spt.l)
 
@@ -26,11 +26,11 @@
 
 // my functions to handle graph reading
 #include "glib-graph.h"
+// the header file for this function
+#include "spt.h"
 
-#include <readline/readline.h> // libreadline for input
 #include <glib.h> // Glib header for data structures (GList, GQueue, ...)
 
-// standard lib headers
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -62,52 +62,47 @@ gint smallest_label(gconstpointer a, gconstpointer b, gpointer user_data)
 }
 
 // The program reads a graph and asks for a root node, then computes the SPT
-int main(void)
+int spt_s(
+  Graph G,
+  GArray *roots,
+  float max_path,
+  float *labels,
+  int *predecessors
+)
 {
-    float max_w;                     // max weight in the graph
-    Graph graph = new_graph(&max_w); // reads the graph using the library glib-graph
-    
-    // the most expensive path possible in the graph (|N|-1)*max_weight + 1.0
-    // is used as a fake edge weigth for the initial tree
-    float max_path = (float)(graph.order - 1) * max_w + 1;
-
-    // the graph is printed to stdout
-    puts("GRAPH");
-    print_graph(stdout, graph);
-
-    // read the root node
-    int root;
-    char *line;
-    line = readline("Enter the root node: ");
-    // node label is assumed to be an integer that can be converted using atoi
-    root = atoi(line);
-
-    free(line);
-    line = NULL;
-
+  int root;
+  // If there's more than one root, then the graph is modified
+  // A new node is added (super_root) and connected with edges
+  // of weight 0 to the roots; the algorithm is then executed
+  // on the modified graph
+  if(roots->len > 1) {
+    root = graph_add_roots(&G, roots);
+  }
+  else {
+    root = g_array_index(roots, int, 0);
+  }
+    // The new graph now has only one root either way
     // SPT.S implements the set Q as a priority queue
     // a list ordered by the smallest label of its elements
     GQueue *Q = g_queue_new();
 
     int i;
-    // alloc an array of elements: 
-    // any vertex of the |N| vertices can be inserted in the queue, 
+    // alloc an array of elements:
+    // any vertex of the |N| vertices can be inserted in the queue,
     // so it's handy to reserve space in advance
-    Element *vertices = (Element *)malloc(graph.order * sizeof(Element));
+    Element *vertices = (Element *)malloc(G.order * sizeof(Element));
     if (vertices == NULL)
     {
-        g_warning("Failed to alloc elements array");
-        exit(EXIT_FAILURE);
+        g_error("Failed to alloc elements array");
     }
-    for (i = 0; i < graph.order; i++)
+    for (i = 0; i < G.order; i++)
     {
         vertices[i] = (struct q_element *)malloc(sizeof(struct q_element));
         if (vertices[i] == NULL)
         {
-            g_warning("Failed to alloc queue element");
-            exit(EXIT_FAILURE);
+            g_error("Failed to alloc queue element");
         }
-        
+
         // build the initial tree, by setting all the labels (except root's)
     	// to max_path and all predecessors as the root of the tree
         if (i != root)
@@ -127,7 +122,7 @@ int main(void)
     // In this case, only the root is violating them, because of how the tree is built
     g_queue_push_head(Q, (void *)vertices[root]);
     // the data must be stored as a gpointer (just a fancy void*)
-    
+
 #ifdef DEBUG
     g_print("Put\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
             vertices[root]->vertex,
@@ -151,7 +146,7 @@ int main(void)
         // priority is the head of the list at each iteration.
         u = (Element)g_queue_pop_head(Q);
         // the cast is needed to convert from gpointer
-        
+
 #ifdef DEBUG
         g_print("Extracted\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
                 u->vertex,
@@ -162,7 +157,7 @@ int main(void)
         // CHECKS BELLMAN CONDITIONS ON THE FORWARD EDGES FROM U
 
         // get u's adjacency list in the graph (cast to Node* from gpointer [void *])
-        adjlist = ((Node *)g_list_nth_data(graph.nodes, u->vertex))->adjacent;
+        adjlist = ((Node *)g_list_nth_data(G.nodes, u->vertex))->adjacent;
 
         // check each forward edge from u
         while (adjlist != NULL)
@@ -190,7 +185,7 @@ int main(void)
                 {
                     // inserts sorted by using the smallest_label compare function
                     g_queue_insert_sorted(Q, (void *)vertices[e->destination], smallest_label, NULL);
-                    
+
 #ifdef DEBUG
                     g_print("Put\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
                             vertices[e->destination]->vertex,
@@ -208,7 +203,7 @@ int main(void)
     printf("After %d iterations, the SPT found by Dijkstra is\n", count_it);
     // the resulting spt is represented by labels & predecessors
     float spt_cost = 0.0;
-    for (i = 0; i < graph.order; i++)
+    for (i = 0; i < G.order; i++)
     {
         printf("label[%d] = %.3f\tpred[%d] = %d\n", i, vertices[i]->label, i, vertices[i]->predecessor);
         spt_cost += vertices[i]->label;
@@ -217,12 +212,12 @@ int main(void)
     printf("Total cost of the SPT: %f\n", spt_cost);
 
 	// all the necessary frees
-    for (i = 0; i < graph.order; i++)
+    for (i = 0; i < G.order; i++)
     {
         free(vertices[i]);
     }
     free(vertices);
     g_queue_free(Q);
-    
-    g_list_free(graph.nodes);
+
+    return 0;
 }

@@ -2,88 +2,86 @@
 
 /*
  * spt.l.c
- * This file is part of spt.l
+ * This file is part of spt
  *
  * Copyright (C) 2021 - etrian-dev
  *
- * spt.l is free software; you can redistribute it and/or modify
+ * spt is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * spt.l is distributed in the hope that it will be useful,
+ * spt is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with spt.l. If not, see <http://www.gnu.org/licenses/>.
+ * along with spt. If not, see <http://www.gnu.org/licenses/>.
  */
 
 // my functions to handle graph reading
 #include "glib-graph.h"
+// the header file for this function
+#include "spt.h"
 
-#include <readline/readline.h> // for reading input lines
 #include <glib.h> // Glib header for data structures (GList, GQueue, ...)
 
-// standard library headers
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
+#include <stdbool.h> // to use boolean constants from C99, could be avoided
 
 /*
  * Definition: Bellman condition
- * Given two vertices i and j in the directed graph G = (N, A) such that 
+ * Given two vertices i and j in the directed graph G = (N, A) such that
  * d_i + c_ij >= d_j, where d_x is the cost of the path in the current SPT
  * to go from the root to vertex x and c_ij is the cost of edge i -> j in the graph.
- * If the above inequality holds, then the bellman condition is said to be satisfied, 
+ * If the above inequality holds, then the bellman condition is said to be satisfied,
  * otherwise it's not satisfied.
  */
 
-// main function: reads a digraph from stdin, then applies Bellman-Ford on it
-// to find the SPT (Shortest Paths Tree) with the given root node (also read from stdin)
-int main(void) {
-
-    float max_w; // stores the max edge weight in the graph
-    // create and read a new graph from stdin
-    Graph graph = new_graph(&max_w);
-
-    // print the graph to stdout
-    puts("GRAPH");
-    print_graph(stdout, graph);
-
-    // choose the root node
+// spt_l applies Bellman-Ford on the graph passed as input, and outputs the labels
+// and predecessors arrays that represent (one of) the shortest path tree, with
+// the given root(s)
+int spt_l(
+  Graph G,
+  GArray *roots,
+  float max_path,
+  float *labels,
+  int *predecessors
+) {
     int root;
-    char *line;
-    line = readline("Enter the root node: ");
-    // node label is assumed to be an integer that can be converted safely using atoi
-    root = atoi(line);
+    // If there's more than one root, then the graph is modified
+    // A new node is added (super_root) and connected with edges
+    // of weight 0 to the roots; the algorithm is then executed
+    // on the modified graph
+    if(roots->len > 1) {
+      root = graph_add_roots(&G, roots);
+    }
+    else {
+      root = g_array_index(roots, int, 0);
+    }
+    // The new graph now has only one root either way
 
-    free(line);
-    line = NULL;
+    /* Allocation of labels and predecessors arrays */
+    // each node has a label: the cost of the current shortest path from root to i
+    labels = (float *)malloc(G.order * sizeof(float));
+    // a node j has a predecessor i in the SPT <=> in the SPT there is an edge i -> j
+    predecessors = (int *)malloc(G.order * sizeof(int));
 
-    // creates an empty queue (FIFO list) to store nodes
+    // creates an empty queue (FIFO list) to store nodes that violate Bellman conditions
     GQueue *Q = g_queue_new();
 
-    // each node has a label: the cost of the current shortest path from root to i
-    float *labels = (float *)malloc(graph.order * sizeof(float));
-
-    // a node j has a predecessor i in the SPT <=> in the SPT there is an edge i -> j
-    int *predecessors = (int *)malloc(graph.order * sizeof(int));
-
-    // the most expensive path (plus a constant) is used as an upper limit for an edge weight
-    float max_path = (float)(graph.order - 1) * max_w + 1.0;
-
-    // array to store how many times a node has been removed from Q
+    // An internal array to store how many times a node has been removed from Q
     // when any node reaches n insertions (and subsequent extractions),
     // then it's proven that the graph contains a cycle with negative weight
     // and thus the instance's optimal solution has no lower bound (-inf)
-    int *count_rm = (int *)calloc(graph.order, sizeof(int));
+    int *count_rm = (int *)calloc(G.order, sizeof(int));
     // the initial values are already zeroed by calloc, no need to initialize them
 
     // the initial tree is built from fake edges with maximum weight (max_path)
     int i;
-    for (i = 0; i < graph.order; i++) {
+    for (i = 0; i < G.order; i++) {
         if (i != root) {
             labels[i] = max_path;
         }
@@ -115,14 +113,14 @@ int main(void) {
 
         // check if there's a negative cycle (a node has been removed |N| times)
         count_rm[i]++;
-        if(count_rm[i] == graph.order) {
+        if(count_rm[i] == G.order) {
             neg_cycle = true;
         }
 
         // checks bellman conditions of the forward edges from i
 
         // get i's adjacency list in the graph
-        adjlist = ((Node *)g_list_nth_data(graph.nodes, i))->adjacent;
+        adjlist = ((Node *)g_list_nth_data(G.nodes, i))->adjacent;
         while (adjlist != NULL) {
             // the cast to Edge* should't be needed, but clarifies what the code is doing
             e = (Edge *)(adjlist->data);
@@ -159,16 +157,14 @@ int main(void) {
     	// the resulting spt is represented by labels & predecessors
         printf("After %d iterations, the SPT found by Bellman-Ford is\n", count_it);
         float spt_cost = 0.0;
-        for (i = 0; i < graph.order; i++) {
+        for (i = 0; i < G.order; i++) {
             printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
             spt_cost += labels[i]; // computes the SPT's cost: the sum of all the labels
         }
         printf("Total cost of the SPT: %f\n", spt_cost);
     }
 
-	// all the necessary frees
-    g_list_free(graph.nodes);
-    free(labels);
-    free(predecessors);
     free(count_rm);
+
+    return 0;
 }

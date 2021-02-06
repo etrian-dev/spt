@@ -1,4 +1,6 @@
 vscode/
 spt.l
 spt.s
+spt
+spt-db
 *.o
