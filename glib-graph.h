@@ -49,8 +49,6 @@ typedef struct graph_t {
 	It's useful in algorithms such as SPT.L or SPT.S
 */
 Graph new_graph(float *max_weight);
-/* frees the memory occupied by the edge edge */
-void destroy_edge(gpointer edge);
 /* Prints the graph to target, where target can be any open file descriptor */
 void print_graph(FILE *target, Graph g);
 

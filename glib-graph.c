@@ -40,23 +40,25 @@ Graph new_graph(float *max_weight) {
   char* line = NULL;
   line = readline("Enter the number of vertices: ");
   g.order = atoi(line); // assuming a valid integer
+  
   free(line);
+  line = NULL;
 
   // dummy list and other variables
   GSList* adjlist = NULL;
   int dest = -1;
   float weight = 0;
-  *max_weight = -INFINITY;  // store smallest value, gets compared lt to any float
+  *max_weight = -INFINITY;  // store smallest value: less than any float
   Node* n = NULL;
   Edge* e = NULL;
   char* token = NULL;
   int i;
 
   for (i = 0; i < g.order; i++) {
-      // reads the adjacency list of vertex i (no prompt)
+      // reads a line containing the adjacency list of vertex i (no prompt)
       line = readline(NULL);
 
-      // tokenizes it: tokens are separated by " "
+      // tokenizes the line: tokens are separated by " "
       token = strtok(line, " ");
 
       while (token) {
@@ -105,10 +107,6 @@ Graph new_graph(float *max_weight) {
   adjlist = NULL;
 
   return g;
-}
-
-void destroy_edge(gpointer edge) {
-    free(edge);
 }
 void print_graph(FILE *target, Graph g) {
     // Dummy variables to explore the graphs

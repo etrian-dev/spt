@@ -66,6 +66,10 @@ int main(void)
 {
     float max_w;                     // max weight in the graph
     Graph graph = new_graph(&max_w); // reads the graph using the library glib-graph
+    
+    // the most expensive path possible in the graph (|N|-1)*max_weight + 1.0
+    // is used as a fake edge weigth for the initial tree
+    float max_path = (float)(graph.order - 1) * max_w + 1;
 
     // the graph is printed to stdout
     puts("GRAPH");
@@ -78,19 +82,21 @@ int main(void)
     // node label is assumed to be an integer that can be converted using atoi
     root = atoi(line);
 
-    // mem free
     free(line);
     line = NULL;
 
-    // SPT.S implements the set Q as a priority queue: a queue where a custom order is maintained
+    // SPT.S implements the set Q as a priority queue
+    // a list ordered by the smallest label of its elements
     GQueue *Q = g_queue_new();
 
     int i;
-    // alloc |N| vertices, just to reserve the memory for all the possible elements in the queue
+    // alloc an array of elements: 
+    // any vertex of the |N| vertices can be inserted in the queue, 
+    // so it's handy to reserve space in advance
     Element *vertices = (Element *)malloc(graph.order * sizeof(Element));
     if (vertices == NULL)
     {
-        g_warning("Failed to alloc queue elements vector");
+        g_warning("Failed to alloc elements array");
         exit(EXIT_FAILURE);
     }
     for (i = 0; i < graph.order; i++)
@@ -101,16 +107,9 @@ int main(void)
             g_warning("Failed to alloc queue element");
             exit(EXIT_FAILURE);
         }
-    }
-
-    // the most expensive path possible in the graph (|N|-1)*max_weight + 1.0
-    // is used as a fake edge weigth for the initial tree
-    float max_path = (float)(graph.order - 1) * max_w + 1;
-
-    // build the initial tree, by setting all the labels (except root's)
-    // to max_path and all predecessor as the root of the tree
-    for (i = 0; i < graph.order; i++)
-    {
+        
+        // build the initial tree, by setting all the labels (except root's)
+    	// to max_path and all predecessors as the root of the tree
         if (i != root)
         {
             vertices[i]->label = max_path;
@@ -128,6 +127,7 @@ int main(void)
     // In this case, only the root is violating them, because of how the tree is built
     g_queue_push_head(Q, (void *)vertices[root]);
     // the data must be stored as a gpointer (just a fancy void*)
+    
 #ifdef DEBUG
     g_print("Put\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
             vertices[root]->vertex,
@@ -145,12 +145,13 @@ int main(void)
     // while Q is not empty, iterate
     while (!g_queue_is_empty(Q))
     {
-        // updates the number of iterations
         count_it++;
 
         // in Dijkstra (SPT.S) Q is a priority queue, so the element with the highest
-        // priority is maintained at the head at each iteration, so that it can be easily popped
+        // priority is the head of the list at each iteration.
         u = (Element)g_queue_pop_head(Q);
+        // the cast is needed to convert from gpointer
+        
 #ifdef DEBUG
         g_print("Extracted\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
                 u->vertex,
@@ -189,6 +190,7 @@ int main(void)
                 {
                     // inserts sorted by using the smallest_label compare function
                     g_queue_insert_sorted(Q, (void *)vertices[e->destination], smallest_label, NULL);
+                    
 #ifdef DEBUG
                     g_print("Put\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
                             vertices[e->destination]->vertex,
@@ -202,9 +204,6 @@ int main(void)
             adjlist = adjlist->next;
         }
     }
-
-    // free the empty queue
-    g_queue_free(Q);
 
     printf("After %d iterations, the SPT found by Dijkstra is\n", count_it);
     // the resulting spt is represented by labels & predecessors
@@ -223,5 +222,7 @@ int main(void)
         free(vertices[i]);
     }
     free(vertices);
+    g_queue_free(Q);
+    
     g_list_free(graph.nodes);
 }
