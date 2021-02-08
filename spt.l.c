@@ -40,6 +40,13 @@
  * otherwise it's not satisfied.
  */
 
+int find_ilist(gconstpointer a, gconstpointer b) {
+  if(((Node *)a)->vertex != ((Node *)b)->vertex) {
+    return -1;
+  }
+  return 0;
+}
+
 // spt_l applies Bellman-Ford on the graph passed as input, and outputs the labels
 // and predecessors arrays that represent (one of) the shortest path tree, with
 // the given root(s)
@@ -56,12 +63,17 @@ int spt_l(
     // of weight 0 to the roots; the algorithm is then executed
     // on the modified graph
     if(roots->len > 1) {
-      root = graph_add_roots(&G, roots);
+      root = graph_add_hyper_root(&G, roots);
     }
     else {
       root = g_array_index(roots, int, 0);
     }
     // The new graph now has only one root either way
+
+#ifdef DEBUG
+    puts("GRAPH");
+    print_graph(stdout, G);
+#endif
 
     /* Allocation of labels and predecessors arrays */
     // each node has a label: the cost of the current shortest path from root to i
@@ -86,10 +98,17 @@ int spt_l(
             labels[i] = max_path;
         }
         else {
-            labels[root] = 0;
+            labels[i] = 0;
         }
         predecessors[i] = root;
     }
+
+#ifdef DEBUG
+    puts("INIT");
+    for(i = 0; i < G.order; i++) {
+      printf("lab[%d] = %f\n", i, labels[i]);
+    }
+#endif
 
     // the tail nodes of those edges who violate bellman conditions
     // must be inserted in Q. In this case, only the root is violating them,
@@ -99,6 +118,7 @@ int spt_l(
 
     Edge *e = NULL;
     GSList *adjlist = NULL;
+    GList *dummy_list = NULL;
     // just counts the number of iterations made by the algorithm
     int count_it = 0;
     // flag that signals the presence of cycles whose total cost is negative
@@ -119,8 +139,26 @@ int spt_l(
 
         // checks bellman conditions of the forward edges from i
 
-        // get i's adjacency list in the graph
-        adjlist = ((Node *)g_list_nth_data(G.nodes, i))->adjacent;
+        // get i's adjacency list in the graph (may not be the i-th!)
+        // TODO: Replace with the correct call to g_list_find_custom and extract then
+        // the adjacency list
+        dummy_list = G.nodes;
+        while(dummy_list && ((Node *)dummy_list->data)->vertex != i) {
+          dummy_list = dummy_list->next;
+        }
+        adjlist = ((Node *)dummy_list->data)->adjacent;
+#ifdef DEBUG
+        g_print("Node %d\'s adjacency list:\n[\n", ((Node *)dummy_list->data)->vertex);
+        GSList *ss = adjlist;
+        while(ss) {
+          Edge *ee = ss->data;
+          g_print("\t{dest = %d, weight = %.3f} ->\n", ee->destination, ee->weight);
+          ss = ss->next;
+        }
+        g_print("\tNULL\n]\n");
+#endif
+
+        //adjlist = ((Node *)g_list_nth_data(G.nodes, i))->adjacent;
         while (adjlist != NULL) {
             // the cast to Edge* should't be needed, but clarifies what the code is doing
             e = (Edge *)(adjlist->data);
@@ -149,6 +187,15 @@ int spt_l(
     }
 
     g_queue_free(Q);
+
+    // if there was more than one root (the algorithm ran on a hyper-root)
+    // then perform cleanup by removing it from the results
+    for(i = 0; i < G.order; i++) {
+      if(predecessors[i] == root) {
+        predecessors[i] = i;
+      }
+    }
+    graph_remove_hyper_root(&G);
 
     if(neg_cycle) {
         puts("Negative cycle! No lower bound.");

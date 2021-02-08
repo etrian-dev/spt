@@ -112,12 +112,25 @@ Graph new_graph(float *min_weight, float *max_weight) {
 
   return g;
 }
+void edge_free(gpointer edge) {
+  free((Edge *)edge);
+}
+void node_free(gpointer node) {
+  // just frees the adjacency list of this node
+  g_slist_free_full(((Node *)node)->adjacent, edge_free);
+  // then free the node
+  free(node);
+}
+
+void graph_free(Graph g) {
+  // frees the GList of Node* and frees the individual nodes as well (by calling node_free on them)
+  g_list_free_full(g.nodes, node_free);
+}
+
 void print_graph(FILE *target, Graph g) {
     // Dummy variables to explore the graphs
     Node* n = NULL;
     Edge* e = NULL;
-    int j;
-
     GList* iter = NULL;
     GSList* adj = NULL;
     for (iter = g.nodes; iter != NULL; iter = iter->next) {
@@ -133,8 +146,9 @@ void print_graph(FILE *target, Graph g) {
 
 // a new node is added as a super root, connecting it with edges
 // of weight 0 to all the nodes in the supplied GArray
-int graph_add_roots(Graph *G, GArray *roots) {
-  // first build the adjacency list of root
+// !!The node is predended to the list of nodes!!
+int graph_add_hyper_root(Graph *G, GArray *roots) {
+  // first build the adjacency list of the super-root
   int i, lenght = roots->len;
   GSList *adjlist = NULL;
   Edge *e = NULL;
@@ -143,7 +157,7 @@ int graph_add_roots(Graph *G, GArray *roots) {
     if(!e) {
       g_error("Failed to alloc Edge");
     }
-    // set the edge's head to the i-th root with weight 0
+    // set the edge's head to the i-th root with edge weight 0
     e->destination = g_array_index(roots, int, i);
     e->weight = 0.0;
     // prepend the edge to the adjacency list of the node
@@ -161,5 +175,9 @@ int graph_add_roots(Graph *G, GArray *roots) {
   G->order += 1;
   G->nodes = g_list_prepend(G->nodes, n);
 
-  return G->order;
+  return G->order - 1;
+}
+
+void graph_remove_hyper_root(Graph *g) {
+
 }

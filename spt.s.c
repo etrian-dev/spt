@@ -76,7 +76,7 @@ int spt_s(
   // of weight 0 to the roots; the algorithm is then executed
   // on the modified graph
   if(roots->len > 1) {
-    root = graph_add_roots(&G, roots);
+    root = graph_add_hyper_root(&G, roots);
   }
   else {
     root = g_array_index(roots, int, 0);

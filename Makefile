@@ -2,7 +2,7 @@
 .PREFIX:
 
 CC = gcc
-CFLAGS = -pedantic `pkg-config --cflags glib-2.0`
+CFLAGS = -Wall -pedantic `pkg-config --cflags glib-2.0`
 DBFLAGS = -g -D DEBUG
 LDLIBS = `pkg-config --libs glib-2.0` -lreadline -lm
 
