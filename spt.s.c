@@ -34,18 +34,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// A queue element is the program's representation of a node in the SPT:
+/*
+ * Definition: Bellman condition
+ * Given two vertices i and j in the directed graph G = (N, A) such that
+ * d_i + c_ij >= d_j, where d_x is the cost of the path in the current SPT
+ * to go from the root to vertex x and c_ij is the cost of edge i -> j in the graph.
+ * If the above inequality holds, then the bellman condition is said to be satisfied,
+ * otherwise it's not satisfied.
+ */
+
+// An element is the function's representation of a node in the SPT:
 struct q_element
 {
-    int vertex;      // the node's identifier (int because it's simple and efficient)
+    int vertex;      // the node's identifier
     int predecessor; // the node's predecessor in the current SPT
-    float label;     // the current shortest path from root to the node
+    float label;     // the cost of the shortest path from root to vertex
 };
 typedef struct q_element *Element;
 
-// glib-style comparison function to compute the priority of Elements
+// GComparisonFunc to compute the relative priority of Elements
 // the priority in this context is given by its label field
-// user_data is just ignored
+// the user_data parameter is just ignored
 gint smallest_label(gconstpointer a, gconstpointer b, gpointer user_data)
 {
     Element pa = (Element)a;
@@ -61,7 +70,7 @@ gint smallest_label(gconstpointer a, gconstpointer b, gpointer user_data)
     return 0;
 }
 
-// The program reads a graph and asks for a root node, then computes the SPT
+// The functions finds one SPT in G with the given root(s)
 int spt_s(
   Graph G,
   GArray *roots,
@@ -81,143 +90,171 @@ int spt_s(
   else {
     root = g_array_index(roots, int, 0);
   }
-    // The new graph now has only one root either way
-    // SPT.S implements the set Q as a priority queue
-    // a list ordered by the smallest label of its elements
-    GQueue *Q = g_queue_new();
-
-    int i;
-    // alloc an array of elements:
-    // any vertex of the |N| vertices can be inserted in the queue,
-    // so it's handy to reserve space in advance
-    Element *vertices = (Element *)malloc(G.order * sizeof(Element));
-    if (vertices == NULL)
-    {
-        g_error("Failed to alloc elements array");
-    }
-    for (i = 0; i < G.order; i++)
-    {
-        vertices[i] = (struct q_element *)malloc(sizeof(struct q_element));
-        if (vertices[i] == NULL)
-        {
-            g_error("Failed to alloc queue element");
-        }
-
-        // build the initial tree, by setting all the labels (except root's)
-    	// to max_path and all predecessors as the root of the tree
-        if (i != root)
-        {
-            vertices[i]->label = max_path;
-        }
-        else
-        {
-            vertices[root]->label = 0.0; // root's label is set to 0 as obvious
-        }
-        vertices[i]->vertex = i;
-        vertices[i]->predecessor = root; // all nodes have root as their predecessor
-    }
-
-    // Q is initialized with all the tail nodes of those edges who violate bellman conditions
-    // BELLMAN: d_u + c_ui >= d_i => OK, otherwise the condition is violated
-    // In this case, only the root is violating them, because of how the tree is built
-    g_queue_push_head(Q, (void *)vertices[root]);
-    // the data must be stored as a gpointer (just a fancy void*)
+  // The new graph has only one root either way
 
 #ifdef DEBUG
-    g_print("Put\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
-            vertices[root]->vertex,
-            vertices[root]->label,
-            vertices[root]->predecessor);
+    puts("GRAPH");
+    print_graph(stdout, G);
 #endif
 
-    // some dummy variables
-    Edge *e = NULL;
-    //Node *n = NULL;
-    GSList *adjlist = NULL;
-    Element u = 0;
-    int count_it = 0; // just counts the iterations of the algorithm
+  // SPT.S implements the set Q as a priority queue
+  // a list ordered by the smallest label of its elements
+  GQueue *Q = g_queue_new();
 
-    // while Q is not empty, iterate
-    while (!g_queue_is_empty(Q))
-    {
-        count_it++;
+  int i;
+  // alloc an array of elements:
+  // any vertex of the |N| vertices can be inserted in the queue,
+  // so it's handy to reserve space in advance
+  Element *vertices = (Element *)malloc(G.order * sizeof(Element));
+  if (vertices == NULL)
+  {
+      g_error("Failed to alloc elements array");
+  }
+  for (i = 0; i < G.order; i++)
+  {
+      vertices[i] = (struct q_element *)malloc(sizeof(struct q_element));
+      if (vertices[i] == NULL)
+      {
+          g_error("Failed to alloc queue element");
+      }
 
-        // in Dijkstra (SPT.S) Q is a priority queue, so the element with the highest
-        // priority is the head of the list at each iteration.
-        u = (Element)g_queue_pop_head(Q);
-        // the cast is needed to convert from gpointer
+      // builds the initial tree, by setting all the labels (except root's)
+  	  // to max_path and all predecessors as the root of the tree
+      if (i != root)
+      {
+          vertices[i]->label = max_path;
+      }
+      else
+      {
+          vertices[root]->label = 0.0; // root's label is set to 0 as obvious
+      }
+      vertices[i]->vertex = i;
+      vertices[i]->predecessor = root; // all nodes have root as their predecessor
+  }
+
+  // Q is initialized with all the tail nodes of those edges violating
+  // bellman conditions; only root meets these conditions at initialization
+  g_queue_push_head(Q, (void *)vertices[root]);
+  // the data must be stored as a gpointer (just a fancy void*)
 
 #ifdef DEBUG
-        g_print("Extracted\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
-                u->vertex,
-                u->label,
-                u->predecessor);
+  g_print("Put\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
+          vertices[root]->vertex,
+          vertices[root]->label,
+          vertices[root]->predecessor);
 #endif
 
-        // CHECKS BELLMAN CONDITIONS ON THE FORWARD EDGES FROM U
+  // some dummy variables
+  Edge *e = NULL;
+  GList *dummy_list = NULL;
+  GSList *adjlist = NULL;
+  Element u = 0;
+  int count_it = 0; // just counts the iterations of the algorithm
 
-        // get u's adjacency list in the graph (cast to Node* from gpointer [void *])
-        adjlist = ((Node *)g_list_nth_data(G.nodes, u->vertex))->adjacent;
+  // while Q is not empty, iterate
+  while (!g_queue_is_empty(Q))
+  {
+      count_it++;
 
-        // check each forward edge from u
-        while (adjlist != NULL)
+      // in Dijkstra (SPT.S) Q is a priority queue, so the element with the highest
+      // priority is the head of the list at each iteration.
+      u = (Element)g_queue_pop_head(Q);
+      // the cast is needed to convert from gpointer
+
+#ifdef DEBUG
+      g_print("Extracted\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
+              u->vertex,
+              u->label,
+              u->predecessor);
+#endif
+
+      // CHECKS BELLMAN CONDITIONS ON THE FORWARD EDGES FROM U
+
+      // get u's adjacency list in the graph (might not be u-th node)
+      dummy_list = G.nodes;
+      while(dummy_list && ((Node *)dummy_list->data)->vertex != u->vertex) {
+        dummy_list = dummy_list->next;
+      }
+      adjlist = ((Node *)dummy_list->data)->adjacent;
+
+      // check conditions on each forward edge from u
+      while (adjlist != NULL)
+      {
+        // the explicit cast is not strictly necessary, but useful to understand what's going on
+        e = (Edge *)adjlist->data;
+        // check if the edge e violates the Bellman condition
+        // BELLMAN: d_u + c_ui < d_i the condition is violated, otherwise it's fine
+        if (vertices[u->vertex]->label + e->weight < vertices[e->destination]->label)
         {
-            // the explicit cast is not strictly necessary, but useful to understand what's going on
-            e = (Edge *)adjlist->data;
-            // check if the edge e violates the Bellman condition
-            // BELLMAN: d_u + c_ui >= d_i => OK, otherwise the condition is violated
-            if (vertices[e->destination]->label > vertices[u->vertex]->label + e->weight)
-            {
-                printf("(%d, %d) violates Bellman\n", u->vertex, e->destination);
-                printf("d_%d\t+\tc_%d_%d\t<\td_%d\n", u->vertex, u->vertex, e->destination, e->destination);
-                printf("%.3f\t+\t%.3f\t<\t%.3f\n", vertices[u->vertex]->label, e->weight, vertices[e->destination]->label);
+          printf("(%d, %d) violates Bellman\n", u->vertex, e->destination);
+          printf("d_%d\t+\tc_%d_%d\t<\td_%d\n", u->vertex, u->vertex, e->destination, e->destination);
+          printf("%.3f\t+\t%.3f\t<\t%.3f\n", vertices[u->vertex]->label, e->weight, vertices[e->destination]->label);
 
-                // update the head node's label (not its subtree)
-                vertices[e->destination]->label = vertices[u->vertex]->label + e->weight;
-                // if the predecessor changes, update it
-                if (vertices[e->destination]->predecessor != u->vertex)
-                {
-                    vertices[e->destination]->predecessor = u->vertex;
-                }
-                // if the vertex e->destination is not in the prioqueue
-                // inserts it while maintaining the queue sorted by lowest label
-                if (g_queue_find(Q, (void *)vertices[e->destination]) == NULL)
-                {
-                    // inserts sorted by using the smallest_label compare function
-                    g_queue_insert_sorted(Q, (void *)vertices[e->destination], smallest_label, NULL);
+          // update the head node's label (not its subtree)
+          vertices[e->destination]->label = vertices[u->vertex]->label + e->weight;
+          // if the predecessor changes, update it
+          if (vertices[e->destination]->predecessor != u->vertex)
+          {
+            vertices[e->destination]->predecessor = u->vertex;
+          }
+          // if the vertex e->destination is not in the prioqueue
+          // inserts it while maintaining the queue sorted by lowest label
+          if (g_queue_find(Q, (void *)vertices[e->destination]) == NULL)
+          {
+            // inserts maintaining sorting by priority (calls smallest_label to compare)
+            g_queue_insert_sorted(Q, (void *)vertices[e->destination], smallest_label, NULL);
 
 #ifdef DEBUG
-                    g_print("Put\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
-                            vertices[e->destination]->vertex,
-                            vertices[e->destination]->label,
-                            vertices[e->destination]->predecessor);
+            g_print("Put\n\tvertex: %d\n\tlabel: %f\n\tpred: %d\n",
+                    vertices[e->destination]->vertex,
+                    vertices[e->destination]->label,
+                    vertices[e->destination]->predecessor);
 #endif
-                }
-            }
-
-            // get the next edge
-            adjlist = adjlist->next;
+          }
         }
-    }
 
-    printf("After %d iterations, the SPT found by Dijkstra is\n", count_it);
-    // the resulting spt is represented by labels & predecessors
-    float spt_cost = 0.0;
-    for (i = 0; i < G.order; i++)
-    {
-        printf("label[%d] = %.3f\tpred[%d] = %d\n", i, vertices[i]->label, i, vertices[i]->predecessor);
-        spt_cost += vertices[i]->label;
-    }
-    // the total cost is also printed to stdout
-    printf("Total cost of the SPT: %f\n", spt_cost);
+        // gets the next edge in this node's adjacency list
+        adjlist = adjlist->next;
+      }
+      // all forward edges have been analyzed, tests for termination
+  }
 
-	// all the necessary frees
-    for (i = 0; i < G.order; i++)
-    {
-        free(vertices[i]);
-    }
-    free(vertices);
-    g_queue_free(Q);
+  g_queue_free(Q);
 
-    return 0;
+  // if there was more than one root (the algorithm ran on a hyper-root)
+  // then perform cleanup by removing it from the results
+  for(i = 0; i < G.order; i++) {
+    if(vertices[i]->predecessor == root) {
+      vertices[i]->predecessor = i;
+    }
+  }
+  graph_remove_hyper_root(&G);
+
+  printf("After %d iterations, the SPT with root(s) [ ", count_it);
+  for(i = 0; i < roots->len - 1; i++) {
+    printf("%d, ", g_array_index(roots, int, i));
+  }
+  printf("%d ]found by Dijkstra is\n", g_array_index(roots, int, roots->len - 1));
+  // the resulting spt is represented by labels & predecessors
+  float spt_cost = 0.0;
+  for (i = 0; i < G.order; i++)
+  {
+    // fill the labels and predecessors arrays the algorithm generated
+    labels[i] = vertices[i]->label;
+    predecessors[i] = vertices[i]->predecessor;
+    // print the spt on stdout
+    printf("label[%d] = %.3f\tpred[%d] = %d\n", i, vertices[i]->label, i, vertices[i]->predecessor);
+    spt_cost += vertices[i]->label;
+  }
+  // the total cost is also printed to stdout
+  printf("Total cost of the SPT: %f\n", spt_cost);
+
+  // free the array of Elements
+  for (i = 0; i < G.order; i++)
+  {
+    free(vertices[i]);
+  }
+  free(vertices);
+
+  return 0;
 }

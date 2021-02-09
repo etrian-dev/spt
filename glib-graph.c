@@ -29,17 +29,20 @@
   Reads the graph from standard input with readline
   Must be stored in an adjacency list format
 */
-Graph new_graph(float *min_weight, float *max_weight) {
+Graph* new_graph(float *min_weight, float *max_weight) {
   // The graph is an adjacency list (doubly linked)
   // of nodes, which in turn contain a singly linked edge list
-  Graph g;
-  g.order = 0;
-  g.nodes = NULL;
+  Graph *g = (Graph *)malloc(sizeof(struct graph_t));
+  if(!g) {
+    g_error("Graph can't be alloc'd");
+  }
+  g->order = 0;
+  g->nodes = NULL;
 
   // reads the order (number of vertices), then the graph
   char* line = NULL;
   line = readline("Enter the number of vertices: ");
-  g.order = atoi(line); // assuming a valid integer
+  g->order = atoi(line); // assuming a valid integer
 
   free(line);
   line = NULL;
@@ -55,7 +58,7 @@ Graph new_graph(float *min_weight, float *max_weight) {
   char* token = NULL;
   int i;
 
-  for (i = 0; i < g.order; i++) {
+  for (i = 0; i < g->order; i++) {
       // reads a line containing the adjacency list of vertex i (no prompt)
       line = readline(NULL);
 
@@ -101,7 +104,7 @@ Graph new_graph(float *min_weight, float *max_weight) {
       n->adjacent = adjlist;
       // Then append to the graph
       // TODO: maybe prepend then reverse at the end
-      g.nodes = g_list_append(g.nodes, n);
+      g->nodes = g_list_append(g->nodes, n);
 
       // then the adjacency list is resetted without deallocating anything
       adjlist = NULL;
@@ -111,20 +114,6 @@ Graph new_graph(float *min_weight, float *max_weight) {
   adjlist = NULL;
 
   return g;
-}
-void edge_free(gpointer edge) {
-  free((Edge *)edge);
-}
-void node_free(gpointer node) {
-  // just frees the adjacency list of this node
-  g_slist_free_full(((Node *)node)->adjacent, edge_free);
-  // then free the node
-  free(node);
-}
-
-void graph_free(Graph g) {
-  // frees the GList of Node* and frees the individual nodes as well (by calling node_free on them)
-  g_list_free_full(g.nodes, node_free);
 }
 
 void print_graph(FILE *target, Graph g) {
@@ -179,5 +168,33 @@ int graph_add_hyper_root(Graph *G, GArray *roots) {
 }
 
 void graph_remove_hyper_root(Graph *g) {
+    // the hyper-root is the first node in the GList and must be removed
+    // First get a link to it
+    GList *hyroot = g->nodes;
+    // then free the data contained in that GList node
+    node_free(hyroot->data);
+    // then delete (remove + free) the list's node
+    // NOTE: do not swap this and the line above: data becomes unreachable,
+    // even though it doesn't leak either way (see valgrind output)
+    g->nodes = g_list_delete_link(g->nodes, hyroot);
+}
 
+void edge_free(gpointer data) {
+  if(data != NULL) {
+    free((Edge *)data);
+  }
+}
+
+void node_free(gpointer data) {
+  // just frees the adjacency list of this node
+  g_slist_free_full(((Node *)data)->adjacent, edge_free);
+  // then the node itself is freed
+  free((Node *)data);
+}
+
+void graph_free(Graph *g) {
+  // frees the nodes list
+  g_list_free_full(g->nodes, node_free);
+  // and then the graph itseff
+  free(g);
 }

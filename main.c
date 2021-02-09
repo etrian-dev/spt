@@ -35,23 +35,25 @@
 #include <string.h>
 
 #define N_IMPLEMENTED 2
-int (*algorithms[N_IMPLEMENTED])(Graph, GArray *, float, float *, int *) = {
-    spt_s, spt_l};
+int (*algorithms[N_IMPLEMENTED])(Graph, GArray *, float, float *, int *) =
+  {
+    spt_s, spt_l // spt.s has index 0, spt.l has index 1
+  };
 
 int main() {
   float max_w, min_w;
   // reads the graph using the library glib-graph
   // Returns the maximum and minimum weights in the graph
-  Graph graph = new_graph(&min_w, &max_w);
+  Graph *graph = new_graph(&min_w, &max_w);
 
   // the most expensive path possible in the graph |N|*max_weight + 1.0
   // is used as a fake edge weigth for the initial tree
-  float max_path = (float)(graph.order) * max_w + 1.0;
+  float max_path = (float)(graph->order) * max_w + 1.0;
 
 #ifdef DEBUG
   // the graph is printed to stdout
   puts("GRAPH");
-  print_graph(stdout, graph);
+  print_graph(stdout, *graph);
 #endif
 
   // read the root nodes: this can be a list of any vertices in the graph
@@ -65,7 +67,7 @@ int main() {
   token = strtok(line, " ");
   while(token != NULL) {
     root = atoi(token); // assumes that it's an integer
-    if(root >= 0 && root < graph.order) {
+    if(root >= 0 && root < graph->order) {
       // appends root and returns the new array:
       spt_rootlist = g_array_append_val(spt_rootlist, root);
     }
@@ -87,11 +89,19 @@ int main() {
   g_print("]\n");
 #endif
 
-  float *spt_labels = NULL;
-  int *spt_pred = NULL;
+  int num_labels = graph->order;
+  if(spt_rootlist->len > 1) {
+    // since a new hyper-root will be added, the number of labels must be one more
+    num_labels++;
+  }
 
-  // applies the chosen spt algorithm on G
-  // If the min weight is less than 0.0, then suggests using spt.l
+  // each node has a label: the cost of the shortest path from root to i
+  float *spt_labels = (float *)malloc(num_labels * sizeof(float));
+  // a node j has a predecessor i in the SPT <=> in the SPT there is an edge i -> j
+  int *spt_pred = (int *)malloc(num_labels * sizeof(int));
+
+  // Applies the chosen algorithm on G
+  // If the min weight is less than 0.0, suggests using spt.l
   if(min_w < 0) {
     g_warning("There is a negative edge in the graph: using SPT.L is strongly suggested");
   }
@@ -102,12 +112,15 @@ int main() {
   {
     g_error("Sorry, this algorithm has not been implemented yet");
   }
-  (*algorithms[choice])(graph, spt_rootlist, max_path, spt_labels, spt_pred);
+  // choose the algorithm from an array of function pointers
+  int rval = (*algorithms[choice])(*graph, spt_rootlist, max_path, spt_labels, spt_pred);
 
   // freeing all the memory before exiting
-  graph_free(graph);
-  g_array_free(spt_rootlist, TRUE);
   free(spt_labels);
   free(spt_pred);
   free(line);
+  g_array_free(spt_rootlist, TRUE);
+  graph_free(graph); // Crashes!!
+
+  return rval;
 }

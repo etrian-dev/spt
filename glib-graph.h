@@ -1,4 +1,4 @@
-// Graph reading utilities using Glib data structures (header file)
+// graph reading utilities using glib data structures (header file)
 /*
  * glib-graph.h
  * This file is part of spt
@@ -48,10 +48,7 @@ typedef struct graph_t {
 	that gets overwritten inside the function.
 	It's useful in algorithms such as SPT.L or SPT.S
 */
-Graph new_graph(float *min_weight, float *max_weight);
-void edge_free(gpointer edge);
-void node_free(gpointer node);
-void graph_free(Graph g);
+Graph* new_graph(float *min_weight, float *max_weight);
 /* Prints the graph to target, where target can be any open file descriptor */
 void print_graph(FILE *target, Graph g);
 // a new node is added as a super root, connecting it with edges
@@ -60,5 +57,8 @@ void print_graph(FILE *target, Graph g);
 int graph_add_hyper_root(Graph *g, GArray *roots);
 // removes the hyper-root from the graph
 void graph_remove_hyper_root(Graph *g);
+void edge_free(gpointer edge);
+void node_free(gpointer node);
+void graph_free(Graph *g);
 
 #endif

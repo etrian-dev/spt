@@ -40,13 +40,6 @@
  * otherwise it's not satisfied.
  */
 
-int find_ilist(gconstpointer a, gconstpointer b) {
-  if(((Node *)a)->vertex != ((Node *)b)->vertex) {
-    return -1;
-  }
-  return 0;
-}
-
 // spt_l applies Bellman-Ford on the graph passed as input, and outputs the labels
 // and predecessors arrays that represent (one of) the shortest path tree, with
 // the given root(s)
@@ -68,18 +61,12 @@ int spt_l(
     else {
       root = g_array_index(roots, int, 0);
     }
-    // The new graph now has only one root either way
+    // The new graph has only one root either way
 
 #ifdef DEBUG
     puts("GRAPH");
     print_graph(stdout, G);
 #endif
-
-    /* Allocation of labels and predecessors arrays */
-    // each node has a label: the cost of the current shortest path from root to i
-    labels = (float *)malloc(G.order * sizeof(float));
-    // a node j has a predecessor i in the SPT <=> in the SPT there is an edge i -> j
-    predecessors = (int *)malloc(G.order * sizeof(int));
 
     // creates an empty queue (FIFO list) to store nodes that violate Bellman conditions
     GQueue *Q = g_queue_new();
@@ -158,7 +145,6 @@ int spt_l(
         g_print("\tNULL\n]\n");
 #endif
 
-        //adjlist = ((Node *)g_list_nth_data(G.nodes, i))->adjacent;
         while (adjlist != NULL) {
             // the cast to Edge* should't be needed, but clarifies what the code is doing
             e = (Edge *)(adjlist->data);
@@ -202,7 +188,11 @@ int spt_l(
     }
     else {
     	// the resulting spt is represented by labels & predecessors
-        printf("After %d iterations, the SPT found by Bellman-Ford is\n", count_it);
+        printf("After %d iterations, the SPT with root(s) [ ", count_it);
+        for(i = 0; i < roots->len - 1; i++) {
+          printf("%d, ", g_array_index(roots, int, i));
+        }
+        printf("%d ] found by Bellman-Ford is:\n", g_array_index(roots, int, roots->len - 1));
         float spt_cost = 0.0;
         for (i = 0; i < G.order; i++) {
             printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
