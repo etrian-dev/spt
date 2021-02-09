@@ -32,7 +32,7 @@
 // runs the Bellman-Ford algorithm (SPT.L) on G
 // returns 0 on success
 int spt_l(
-  Graph G,
+  Graph *G,
   GArray *roots,
   float max_path,
   float *labels,
@@ -42,7 +42,7 @@ int spt_l(
 // runs Dijkstra's algorithm (SPT.S) on G
 // returns 0 on success
 int spt_s(
-  Graph G,
+  Graph *G,
   GArray *roots,
   float max_path,
   float *labels,

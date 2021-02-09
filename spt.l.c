@@ -44,7 +44,7 @@
 // and predecessors arrays that represent (one of) the shortest path tree, with
 // the given root(s)
 int spt_l(
-  Graph G,
+  Graph *G,
   GArray *roots,
   float max_path,
   float *labels,
@@ -56,7 +56,7 @@ int spt_l(
     // of weight 0 to the roots; the algorithm is then executed
     // on the modified graph
     if(roots->len > 1) {
-      root = graph_add_hyper_root(&G, roots);
+      root = graph_add_hyper_root(G, roots);
     }
     else {
       root = g_array_index(roots, int, 0);
@@ -65,7 +65,7 @@ int spt_l(
 
 #ifdef DEBUG
     puts("GRAPH");
-    print_graph(stdout, G);
+    print_graph(stdout, *G);
 #endif
 
     // creates an empty queue (FIFO list) to store nodes that violate Bellman conditions
@@ -75,12 +75,12 @@ int spt_l(
     // when any node reaches n insertions (and subsequent extractions),
     // then it's proven that the graph contains a cycle with negative weight
     // and thus the instance's optimal solution has no lower bound (-inf)
-    int *count_rm = (int *)calloc(G.order, sizeof(int));
+    int *count_rm = (int *)calloc(G->order, sizeof(int));
     // the initial values are already zeroed by calloc, no need to initialize them
 
     // the initial tree is built from fake edges with maximum weight (max_path)
     int i;
-    for (i = 0; i < G.order; i++) {
+    for (i = 0; i < G->order; i++) {
         if (i != root) {
             labels[i] = max_path;
         }
@@ -92,7 +92,7 @@ int spt_l(
 
 #ifdef DEBUG
     puts("INIT");
-    for(i = 0; i < G.order; i++) {
+    for(i = 0; i < G->order; i++) {
       printf("lab[%d] = %f\n", i, labels[i]);
     }
 #endif
@@ -120,7 +120,7 @@ int spt_l(
 
         // check if there's a negative cycle (a node has been removed |N| times)
         count_rm[i]++;
-        if(count_rm[i] == G.order) {
+        if(count_rm[i] == G->order) {
             neg_cycle = true;
         }
 
@@ -129,7 +129,7 @@ int spt_l(
         // get i's adjacency list in the graph (may not be the i-th!)
         // TODO: Replace with the correct call to g_list_find_custom and extract then
         // the adjacency list
-        dummy_list = G.nodes;
+        dummy_list = G->nodes;
         while(dummy_list && ((Node *)dummy_list->data)->vertex != i) {
           dummy_list = dummy_list->next;
         }
@@ -176,12 +176,12 @@ int spt_l(
 
     // if there was more than one root (the algorithm ran on a hyper-root)
     // then perform cleanup by removing it from the results
-    for(i = 0; i < G.order; i++) {
+    for(i = 0; i < G->order; i++) {
       if(predecessors[i] == root) {
         predecessors[i] = i;
       }
     }
-    graph_remove_hyper_root(&G);
+    graph_remove_hyper_root(G);
 
     if(neg_cycle) {
         puts("Negative cycle! No lower bound.");
@@ -194,7 +194,7 @@ int spt_l(
         }
         printf("%d ] found by Bellman-Ford is:\n", g_array_index(roots, int, roots->len - 1));
         float spt_cost = 0.0;
-        for (i = 0; i < G.order; i++) {
+        for (i = 0; i < G->order; i++) {
             printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
             spt_cost += labels[i]; // computes the SPT's cost: the sum of all the labels
         }

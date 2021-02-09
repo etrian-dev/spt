@@ -35,7 +35,7 @@
 #include <string.h>
 
 #define N_IMPLEMENTED 2
-int (*algorithms[N_IMPLEMENTED])(Graph, GArray *, float, float *, int *) =
+int (*algorithms[N_IMPLEMENTED])(Graph *, GArray *, float, float *, int *) =
   {
     spt_s, spt_l // spt.s has index 0, spt.l has index 1
   };
@@ -113,7 +113,7 @@ int main() {
     g_error("Sorry, this algorithm has not been implemented yet");
   }
   // choose the algorithm from an array of function pointers
-  int rval = (*algorithms[choice])(*graph, spt_rootlist, max_path, spt_labels, spt_pred);
+  int rval = (*algorithms[choice])(graph, spt_rootlist, max_path, spt_labels, spt_pred);
 
   // freeing all the memory before exiting
   free(spt_labels);

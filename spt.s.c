@@ -72,7 +72,7 @@ gint smallest_label(gconstpointer a, gconstpointer b, gpointer user_data)
 
 // The functions finds one SPT in G with the given root(s)
 int spt_s(
-  Graph G,
+  Graph *G,
   GArray *roots,
   float max_path,
   float *labels,
@@ -85,7 +85,7 @@ int spt_s(
   // of weight 0 to the roots; the algorithm is then executed
   // on the modified graph
   if(roots->len > 1) {
-    root = graph_add_hyper_root(&G, roots);
+    root = graph_add_hyper_root(G, roots);
   }
   else {
     root = g_array_index(roots, int, 0);
@@ -94,7 +94,7 @@ int spt_s(
 
 #ifdef DEBUG
     puts("GRAPH");
-    print_graph(stdout, G);
+    print_graph(stdout, *G);
 #endif
 
   // SPT.S implements the set Q as a priority queue
@@ -105,12 +105,12 @@ int spt_s(
   // alloc an array of elements:
   // any vertex of the |N| vertices can be inserted in the queue,
   // so it's handy to reserve space in advance
-  Element *vertices = (Element *)malloc(G.order * sizeof(Element));
+  Element *vertices = (Element *)malloc(G->order * sizeof(Element));
   if (vertices == NULL)
   {
       g_error("Failed to alloc elements array");
   }
-  for (i = 0; i < G.order; i++)
+  for (i = 0; i < G->order; i++)
   {
       vertices[i] = (struct q_element *)malloc(sizeof(struct q_element));
       if (vertices[i] == NULL)
@@ -171,7 +171,7 @@ int spt_s(
       // CHECKS BELLMAN CONDITIONS ON THE FORWARD EDGES FROM U
 
       // get u's adjacency list in the graph (might not be u-th node)
-      dummy_list = G.nodes;
+      dummy_list = G->nodes;
       while(dummy_list && ((Node *)dummy_list->data)->vertex != u->vertex) {
         dummy_list = dummy_list->next;
       }
@@ -223,12 +223,12 @@ int spt_s(
 
   // if there was more than one root (the algorithm ran on a hyper-root)
   // then perform cleanup by removing it from the results
-  for(i = 0; i < G.order; i++) {
+  for(i = 0; i < G->order; i++) {
     if(vertices[i]->predecessor == root) {
       vertices[i]->predecessor = i;
     }
   }
-  graph_remove_hyper_root(&G);
+  graph_remove_hyper_root(G);
 
   printf("After %d iterations, the SPT with root(s) [ ", count_it);
   for(i = 0; i < roots->len - 1; i++) {
@@ -237,7 +237,7 @@ int spt_s(
   printf("%d ]found by Dijkstra is\n", g_array_index(roots, int, roots->len - 1));
   // the resulting spt is represented by labels & predecessors
   float spt_cost = 0.0;
-  for (i = 0; i < G.order; i++)
+  for (i = 0; i < G->order; i++)
   {
     // fill the labels and predecessors arrays the algorithm generated
     labels[i] = vertices[i]->label;
@@ -250,7 +250,7 @@ int spt_s(
   printf("Total cost of the SPT: %f\n", spt_cost);
 
   // free the array of Elements
-  for (i = 0; i < G.order; i++)
+  for (i = 0; i < G->order; i++)
   {
     free(vertices[i]);
   }
