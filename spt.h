@@ -1,5 +1,8 @@
-// Defines the functions that implement Bellman-Ford and Dijkstra's algorithms
-// for finding the shortest path tree (and related functions)
+// This header declares two functions to find the SPT of a directed, weighted graph
+// They implement Bellman-Ford's algorithm (spt_l) and Dijkstra's algorithm (spt_s)
+// They both take as input a graph and return two arrays representing the shortest
+// path tree on that graph (if more than one optimal solution exists, only one of
+// these is found)
 
 /*
  * spt.h
@@ -29,8 +32,19 @@
 
 #include <glib.h> // Glib header for data structures (GList, GQueue, ...)
 
+/*
+ * Definition: Bellman condition
+ * Given two vertices i and j in the directed graph G = (N, A) such that
+ * d_i + c_ij >= d_j, where d_x is the cost of the path in the current SPT
+ * to go from the root to vertex x and c_ij is the cost of edge i -> j in the graph.
+ * If the above inequality holds, then the bellman condition is said to be satisfied,
+ * otherwise it's not satisfied.
+ */
+
+#define NO_LOWER_BOUND -1 // if the instance has no lower bound, spt_l returns this value
+
 // runs the Bellman-Ford algorithm (SPT.L) on G
-// returns 0 on success
+// returns the number of iterations needed on success
 int spt_l(
   Graph *G,
   GArray *roots,
@@ -40,7 +54,7 @@ int spt_l(
 );
 
 // runs Dijkstra's algorithm (SPT.S) on G
-// returns 0 on success
+// returns the number of iterations needed on success
 int spt_s(
   Graph *G,
   GArray *roots,

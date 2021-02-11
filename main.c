@@ -34,36 +34,53 @@
 #include <stdlib.h>
 #include <string.h>
 
+// define an array of function pointers to choose the algorithm to run on G at runtime
 #define N_IMPLEMENTED 2
-int (*algorithms[N_IMPLEMENTED])(Graph *, GArray *, float, float *, int *) =
-  {
-    spt_s, spt_l // spt.s has index 0, spt.l has index 1
-  };
+int (*algorithms[N_IMPLEMENTED])(Graph *, GArray *, float, float *, int *) = {
+  spt_s, spt_l // spt.s has index 0, spt.l has index 1
+};
+
+void print_spt(char *algorithm, GArray *roots, float *labels, int *predecessors, const int iterations, const int graph_order) {
+  // the resulting spt is represented by labels & predecessors
+  float spt_cost = 0.0;
+  int i;
+  printf("After %d iterations, the SPT with root(s) [ ", iterations);
+  for(i = 0; i < roots->len - 1; i++) {
+    printf("%d, ", g_array_index(roots, int, i));
+  }
+  printf("%d ] found by %s is:\n", g_array_index(roots, int, roots->len - 1), algorithm);
+  for (i = 0; i < graph_order; i++) {
+    printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
+    spt_cost += labels[i]; // computes the SPT's cost: the sum of all the labels
+  }
+  printf("Total cost of the SPT: %f\n", spt_cost);
+}
+
+// Main function
 
 int main() {
   float max_w, min_w;
   // reads the graph using the library glib-graph
-  // Returns the maximum and minimum weights in the graph
   Graph *graph = new_graph(&min_w, &max_w);
+  // stores in max_w and min_w the maximum and minimum weights of edges in the graph
 
-  // the most expensive path possible in the graph |N|*max_weight + 1.0
-  // is used as a fake edge weigth for the initial tree
+  // The most expensive path in the graph is |N|*max_weight
+  // Adding 1.0 to that gives the value used as a fake edge weigth for the initial tree
   float max_path = (float)(graph->order) * max_w + 1.0;
 
-#ifdef DEBUG
-  // the graph is printed to stdout
+#ifdef DEBUG // the graph is printed to stdout
   puts("GRAPH");
   print_graph(stdout, *graph);
 #endif
 
-  // read the root nodes: this can be a list of any vertices in the graph
+  // Read the root nodes: this can be a list of any vertices in the graph
   int root;
   char *token, *line;
-  line = readline("Set the root(s): ");
-
-  // The data structure that stores the roots is a GArray
+  // The data structure that stores the root list is a GArray
   GArray *spt_rootlist = g_array_new(FALSE, FALSE, sizeof(int));
 
+  line = readline("Set the root(s): ");
+  // tokenizes the input line to get the vertices
   token = strtok(line, " ");
   while(token != NULL) {
     root = atoi(token); // assumes that it's an integer
@@ -80,8 +97,7 @@ int main() {
   free(line);
   line = token = NULL;
 
-#ifdef DEBUG
-  // print the spt_rootlist
+#ifdef DEBUG // print the spt_rootlist
   g_print("ROOTLIST: [");
   for(int i = 0; i < spt_rootlist->len; i++) {
     g_print("%d, ", g_array_index(spt_rootlist, int, i));
@@ -112,15 +128,25 @@ int main() {
   {
     g_error("Sorry, this algorithm has not been implemented yet");
   }
+  char *chosen_algo = (choice == 0 ? "Dijkstra" : "Bellman-Ford");
+  g_print("Run %s...\n", chosen_algo);
   // choose the algorithm from an array of function pointers
-  int rval = (*algorithms[choice])(graph, spt_rootlist, max_path, spt_labels, spt_pred);
+  int iterations = (*algorithms[choice])(graph, spt_rootlist, max_path, spt_labels, spt_pred);
+
+  // Print the resulting SPT
+  if(iterations == NO_LOWER_BOUND) {
+      puts("Negative cycle! No lower bound.");
+  }
+  else {
+    print_spt(chosen_algo, spt_rootlist, spt_labels, spt_pred, iterations, graph->order);
+  }
 
   // freeing all the memory before exiting
   free(spt_labels);
   free(spt_pred);
   free(line);
   g_array_free(spt_rootlist, TRUE);
-  graph_free(graph); // Crashes!!
+  graph_free(graph);
 
-  return rval;
+  return 0;
 }

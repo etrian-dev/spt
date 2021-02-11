@@ -1,4 +1,5 @@
-// finds the SPT in a digraph G = (N, E) with the Bellman-Ford algorithm in O(|V|*|E|) time
+// Finds (one of) the SPT in a directed graph G = (V, E) using the Bellman-Ford algorithm
+// The time complexity is O(|V|*|E|)
 
 /*
  * spt.l.c
@@ -22,7 +23,7 @@
 
 // my functions to handle graph reading
 #include "glib-graph.h"
-// the header file for this function
+// the header file where this function is declared
 #include "spt.h"
 
 #include <glib.h> // Glib header for data structures (GList, GQueue, ...)
@@ -31,18 +32,9 @@
 #include <stdlib.h>
 #include <stdbool.h> // to use boolean constants from C99, could be avoided
 
-/*
- * Definition: Bellman condition
- * Given two vertices i and j in the directed graph G = (N, A) such that
- * d_i + c_ij >= d_j, where d_x is the cost of the path in the current SPT
- * to go from the root to vertex x and c_ij is the cost of edge i -> j in the graph.
- * If the above inequality holds, then the bellman condition is said to be satisfied,
- * otherwise it's not satisfied.
- */
-
-// spt_l applies Bellman-Ford on the graph passed as input, and outputs the labels
-// and predecessors arrays that represent (one of) the shortest path tree, with
-// the given root(s)
+// spt_l applies Bellman-Ford on the graph G based on the list of roots
+// and outputs the labels and predecessors arrays that represent (one of)
+// the shortest paths tree
 int spt_l(
   Graph *G,
   GArray *roots,
@@ -50,20 +42,18 @@ int spt_l(
   float *labels,
   int *predecessors
 ) {
+    // The algorithm supports multiple roots, by adding a node connected to all
+    // the roots with weigth 0 and applying the procedure on the modified graph
+    // and the new node as the root of the spt. Afterwards, the node is removed
     int root;
-    // If there's more than one root, then the graph is modified
-    // A new node is added (super_root) and connected with edges
-    // of weight 0 to the roots; the algorithm is then executed
-    // on the modified graph
     if(roots->len > 1) {
       root = graph_add_hyper_root(G, roots);
     }
     else {
       root = g_array_index(roots, int, 0);
     }
-    // The new graph has only one root either way
 
-#ifdef DEBUG
+#ifdef DEBUG // prints the modified graph
     puts("GRAPH");
     print_graph(stdout, *G);
 #endif
@@ -72,13 +62,15 @@ int spt_l(
     GQueue *Q = g_queue_new();
 
     // An internal array to store how many times a node has been removed from Q
-    // when any node reaches n insertions (and subsequent extractions),
-    // then it's proven that the graph contains a cycle with negative weight
-    // and thus the instance's optimal solution has no lower bound (-inf)
+    // When any node reaches n insertions (and subsequent extractions),
+    // then it's proved that the graph contains a cycle with total weight < 0
+    // =>
+    // The given graph's optimal solution has no lower bound (-inf)
     int *count_rm = (int *)calloc(G->order, sizeof(int));
-    // the initial values are already zeroed by calloc, no need to initialize them
 
-    // the initial tree is built from fake edges with maximum weight (max_path)
+    // An initial tree is needed to start the algorithm; a simple way to obtain such
+    // a tree is to connect all nodes to the root with max_w as their edge weight
+    // so that this edge will always violate Bellman conditions
     int i;
     for (i = 0; i < G->order; i++) {
         if (i != root) {
@@ -90,26 +82,20 @@ int spt_l(
         predecessors[i] = root;
     }
 
-#ifdef DEBUG
-    puts("INIT");
-    for(i = 0; i < G->order; i++) {
-      printf("lab[%d] = %f\n", i, labels[i]);
-    }
-#endif
-
-    // the tail nodes of those edges who violate bellman conditions
+    // The tail nodes of those edges who violate Bellman conditions
     // must be inserted in Q. In this case, only the root is violating them,
-    // because of how the tree is built
+    // because of how the initial tree has been built
     g_queue_push_tail(Q, GINT_TO_POINTER(root));
-    // an element in Q must be stored as a gpointer, so the macro converts it from int
+    // An element in Q must be stored as a gpointer, so the macro converts it from int
 
+    // Counts the number of iterations made by the algorithm
+    int count_it = 0;
+    // Flag that signals the presence of cycles whose total cost is negative
+    bool neg_cycle = false;
+    // Other dummy variables
     Edge *e = NULL;
     GSList *adjlist = NULL;
     GList *dummy_list = NULL;
-    // just counts the number of iterations made by the algorithm
-    int count_it = 0;
-    // flag that signals the presence of cycles whose total cost is negative
-    bool neg_cycle = false;
 
     // iterate while Q is not empty and a negative cycle hasn't been found
     while (!(g_queue_is_empty(Q) || neg_cycle)) {
@@ -118,23 +104,24 @@ int spt_l(
         i = GPOINTER_TO_INT(g_queue_pop_head(Q));
         // data in Q is a gpointer, the macro converts it back to int
 
-        // check if there's a negative cycle (a node has been removed |N| times)
+        // check if there's a negative cycle (a node has been removed |V| times)
         count_rm[i]++;
         if(count_rm[i] == G->order) {
             neg_cycle = true;
         }
 
-        // checks bellman conditions of the forward edges from i
+        // Check bellman conditions of the forward edges from i
 
-        // get i's adjacency list in the graph (may not be the i-th!)
-        // TODO: Replace with the correct call to g_list_find_custom and extract then
-        // the adjacency list
+        // get i's adjacency list
+        // TODO: Replace with the correct call to g_list_find_custom to find
+        // the i-th vertex's adjacency list
         dummy_list = G->nodes;
         while(dummy_list && ((Node *)dummy_list->data)->vertex != i) {
           dummy_list = dummy_list->next;
         }
         adjlist = ((Node *)dummy_list->data)->adjacent;
-#ifdef DEBUG
+
+#ifdef DEBUG // prints the adjacency list of node i
         g_print("Node %d\'s adjacency list:\n[\n", ((Node *)dummy_list->data)->vertex);
         GSList *ss = adjlist;
         while(ss) {
@@ -145,20 +132,19 @@ int spt_l(
         g_print("\tNULL\n]\n");
 #endif
 
+        // Iterate over all the elements in the list
         while (adjlist != NULL) {
-            // the cast to Edge* should't be needed, but clarifies what the code is doing
-            e = (Edge *)(adjlist->data);
-            // edge (i, e->destination) satisfies the Bellman condition?
+            e = (Edge *)adjlist->data;
+
             if (labels[e->destination] > labels[i] + e->weight) {
                 printf("(%d, %d) violates Bellman\n", i, e->destination);
                 printf("d_%d\t+\tc_%d_%d\t<\td_%d\n", i, i, e->destination, e->destination);
                 printf("%.3f\t+\t%.3f\t<\t%.3f\n", labels[i], e->weight, labels[e->destination]);
 
-                // update the label of e->destioation with the shorter path passing from i
-                // its subtree's labels should be updated as well, but this can be delayed
-                // (labels update delay) to speed up the execution
+                // update the label of e->destination; delays update on the subtree
+                // to subsequent iteration to speed up the execution
                 labels[e->destination] = labels[i] + e->weight;
-                // if necessary, change the predecessor of e->destination
+
                 if (predecessors[e->destination] != i) {
                     predecessors[e->destination] = i;
                 }
@@ -171,11 +157,11 @@ int spt_l(
             adjlist = adjlist->next;
         }
     }
-
     g_queue_free(Q);
+    free(count_rm);
 
-    // if there was more than one root (the algorithm ran on a hyper-root)
-    // then perform cleanup by removing it from the results
+    // If there was more than one root (the algorithm ran on a hyper-root)
+    // perform cleanup by removing it from the graph and updating the outputs accordingly
     for(i = 0; i < G->order; i++) {
       if(predecessors[i] == root) {
         predecessors[i] = i;
@@ -183,25 +169,9 @@ int spt_l(
     }
     graph_remove_hyper_root(G);
 
+    // then returns to the caller the number of iterations performed
     if(neg_cycle) {
-        puts("Negative cycle! No lower bound.");
+      return NO_LOWER_BOUND; // special value returned to signal no lower bound
     }
-    else {
-    	// the resulting spt is represented by labels & predecessors
-        printf("After %d iterations, the SPT with root(s) [ ", count_it);
-        for(i = 0; i < roots->len - 1; i++) {
-          printf("%d, ", g_array_index(roots, int, i));
-        }
-        printf("%d ] found by Bellman-Ford is:\n", g_array_index(roots, int, roots->len - 1));
-        float spt_cost = 0.0;
-        for (i = 0; i < G->order; i++) {
-            printf("label[%d] = %.3f\tpred[%d] = %d\n", i, labels[i], i, predecessors[i]);
-            spt_cost += labels[i]; // computes the SPT's cost: the sum of all the labels
-        }
-        printf("Total cost of the SPT: %f\n", spt_cost);
-    }
-
-    free(count_rm);
-
-    return 0;
+    return count_it;
 }
